@@ -41,7 +41,6 @@ has lazy => (is => 'ro', lazy => 1, builder => 1);
 has builder => (is => 'ro', lazy => 1, builder => 1);
 has default => (is => 'ro', lazy => 1, builder => 1);
 has constraint => (is => 'lazy', init_arg => 'isa');
-has class_constraint => (is => 'ro', init_arg => 'class');
 has coercion => (is => 'lazy', init_arg => 'coerce');
 has clearer => (is => 'ro');
 has trigger_set => (is => 'ro', init_arg => 'on_set');
@@ -60,18 +59,8 @@ sub BUILD {
     $self->_check_property_signals;
 }
 
-sub _build_constraint {
-    my ($self) = @_;
-    if (defined( my $class = $self->class_constraint )) {
-        return sub {
-            my $val = $_[0];
-            die "Not an instance of $class\n"
-                unless $val->$_isa($class);
-            return 1;
-        };
-    }
-    return undef;
-}
+sub _build_constraint { undef }
+sub _build_coercion { undef }
 
 sub _build_default { undef }
 sub _build__property_signals { [] }

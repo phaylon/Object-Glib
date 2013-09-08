@@ -30,19 +30,4 @@ group 'isa option' => sub {
         'check failed on write';
 };
 
-group 'class option' => sub {
-    my $class = TestProperty(
-        is => 'rw',
-        class => 'TestObject',
-    );
-    my $obj = $class->new;
-    is $obj->set_prop(bless {}, 'TestObject'), 1, 'correct class';
-    like exception { $obj->set_prop(bless {}, 'WrongObject') },
-        qr{Property 'prop' value error: Not an instance of TestObject},
-        'wrong class';
-    like exception { $obj->set_prop([]) },
-        qr{Property 'prop' value error: Not an instance of TestObject},
-        'non object';
-};
-
 done_testing;
