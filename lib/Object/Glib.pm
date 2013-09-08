@@ -37,6 +37,7 @@ sub import {
         };
     }
     Class::Method::Modifiers->import::into($class);
+    strictures->import::into($class, 1);
     return 1;
 }
 

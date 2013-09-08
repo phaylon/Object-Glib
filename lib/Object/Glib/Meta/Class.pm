@@ -70,6 +70,7 @@ sub add_property {
 sub add_signal {
     my ($self, $signal) = @_;
     $self->_signals->{ $signal->name } = $signal;
+    $signal->install_into($self);
     return 1;
 }
 
@@ -103,6 +104,9 @@ sub register {
     Glib::Type->register_object(
         $self->superclass,
         $self->package,
+        signals => {
+            (map { ($_->name, $_->glib) } $self->signals),
+        },
         properties => [
             (map { $_->glib } values %{ $self->_properties }),
             Glib::ParamSpec->scalar(
@@ -115,6 +119,11 @@ sub register {
     );
     $self->_install_constructor;
     return 1;
+}
+
+sub signals {
+    my ($self) = @_;
+    return values %{ $self->_signals };
 }
 
 sub properties {
