@@ -592,4 +592,44 @@ subtest 'trigger options' => sub {
     is $unset, 0, 'unset not triggered by init';
 };
 
+subtest 'required option' => sub {
+    my $class = TestProperty(
+        is => 'ro',
+        required => 1,
+    );
+    is $class->new(prop => 23)->get_prop, 23, 'no error with value';
+    like exception { $class->new },
+        qr{Missing constructor arguments.+prop},
+        'error without value';
+};
+
+subtest 'predicate option' => sub {
+    subtest 'custom name' => sub {
+        my $class = TestProperty(is => 'rw', predicate => 'has_prop');
+        my $obj = $class->new;
+        ok !$obj->has_prop, 'false without value';
+        $obj->set_prop(23);
+        ok $obj->has_prop, 'true with value';
+    };
+    subtest 'auto named' => sub {
+        my $class = TestProperty(is => 'rw', predicate => 1);
+        my $obj = $class->new;
+        ok !$obj->_has_prop, 'false without value';
+        $obj->set_prop(23);
+        ok $obj->_has_prop, 'true with value';
+    };
+    subtest 'lazy' => sub {
+        my $class = TestProperty(
+            is => 'ro',
+            default => sub { 23 },
+            predicate => 1,
+            lazy => 1,
+        );
+        my $obj = $class->new;
+        ok !$obj->_has_prop, 'no value yet';
+        $obj->get_prop;
+        ok $obj->_has_prop, 'value after default';
+    };
+};
+
 done_testing;

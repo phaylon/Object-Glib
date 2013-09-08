@@ -43,12 +43,38 @@ has coercion => (is => 'ro', init_arg => 'coerce');
 has clearer => (is => 'ro');
 has trigger_set => (is => 'ro', init_arg => 'on_set');
 has trigger_unset => (is => 'ro', init_arg => 'on_unset');
+has required => (is => 'ro');
+has predicate => (is => 'ro');
+
+sub BUILD {
+    my ($self) = @_;
+    croak q{A defaulted property cannot be required}
+        if $self->required and defined $self->default;
+    croak q{A built property cannot be required}
+        if $self->required and defined $self->builder;
+    croak q{A required property needs an init_arg}
+        if $self->required and not defined $self->init_arg;
+}
 
 sub install_into {
     my ($self, $meta) = @_;
     $self->_install_accessors_into($meta);
     $self->_install_clearer_into($meta);
     $self->_install_builder_into($meta);
+    $self->_install_predicate_into($meta);
+    return 1;
+}
+
+sub _install_predicate_into {
+    my ($self, $meta) = @_;
+    if (defined( my $pred = $self->predicate )) {
+        $pred = $self->_autom($pred, '_has_%s');
+        my $name = $self->name;
+        $meta->install_method($pred, sub {
+            my ($instance) = @_;
+            return $instance->{ $name } ? 1 : 0;
+        });
+    }
     return 1;
 }
 

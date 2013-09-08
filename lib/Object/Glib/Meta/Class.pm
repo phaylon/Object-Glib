@@ -153,6 +153,9 @@ sub _prepare_build_spec {
                 $spec{default_always}{ $prop->name } = $prop->init_ref;
             }
         }
+        if ($prop->required) {
+            $spec{required}{ $prop->init_arg } = 1;
+        }
     }
     for my $prop ($self->_nonmeta_properties) {
         my $flags = $prop->get_flags;
@@ -192,6 +195,13 @@ sub _install_constructor {
                     $setter{ $key } = [$code, delete $arg{ $key }];
                 }
             }
+            my @missing =
+                sort
+                grep { not exists $orig{ $_ } }
+                keys %{ $spec->{required} };
+            croak sprintf q{Missing constructor arguments for %s: %s},
+                $class, join ', ', @missing
+                if @missing;
             my $instance = Glib::Object::new($class, %construct);
             $instance->set(object_glib_state => 'constructed');
             $instance->set(%direct);
