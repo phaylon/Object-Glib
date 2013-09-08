@@ -6,8 +6,8 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'writable option' => sub {
-    subtest 'writable' => sub {
+group 'writable option' => sub {
+    group 'writable' => sub {
         my $class = TestProperty(
             is => 'bare',
             writable => 1,
@@ -19,7 +19,7 @@ subtest 'writable option' => sub {
         $obj->set(prop => 23);
         is $obj->get('prop'), 23, 'after direct write';
     };
-    subtest 'not writable' => sub {
+    group 'not writable' => sub {
         my $class = TestProperty(
             is => 'bare',
             writable => 0,
@@ -34,8 +34,8 @@ subtest 'writable option' => sub {
     };
 };
 
-subtest 'readable option' => sub {
-    subtest 'not readable' => sub {
+group 'readable option' => sub {
+    group 'not readable' => sub {
         my $class = TestProperty(
             is => 'ro',
             writable => 1,

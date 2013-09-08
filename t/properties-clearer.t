@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'lazy' => sub {
+group 'lazy' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',
@@ -25,7 +25,7 @@ subtest 'lazy' => sub {
     is $n, 25, 'default called once for new value';
 };
 
-subtest 'non lazy' => sub {
+group 'non lazy' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',
@@ -43,7 +43,7 @@ subtest 'non lazy' => sub {
     is $n, 24, 'default not called after read';
 };
 
-subtest 'auto named' => sub {
+group 'auto named' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',

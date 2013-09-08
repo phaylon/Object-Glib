@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'isa option' => sub {
+group 'isa option' => sub {
     my $call = 0;
     my $class = TestProperty(
         is => 'rw',

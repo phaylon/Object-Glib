@@ -8,7 +8,7 @@ use Object::Glib::TestProperty;
 
 my $is_ro = TestProperty(is => 'ro');
 
-subtest 'is ro without value' => sub {
+group 'is ro without value' => sub {
     test_accessors($is_ro, 'prop', 1, 0, 0, 0);
     my $obj = $is_ro->new;
     is $obj->get('prop'), undef, 'undef by default';
@@ -18,7 +18,7 @@ subtest 'is ro without value' => sub {
         'direct set';
 };
 
-subtest 'is ro with value' => sub {
+group 'is ro with value' => sub {
     my $obj = $is_ro->new(prop => 23);
     is $obj->get('prop'), 23, 'constructor arg direct';
     is $obj->get_prop, 23, 'constructor arg via reader';
@@ -27,7 +27,7 @@ subtest 'is ro with value' => sub {
         'direct set';
 };
 
-subtest 'is rw' => sub {
+group 'is rw' => sub {
     my $is_rw = TestProperty(is => 'rw');
     test_accessors($is_rw, 'prop', 1, 1, 0, 0);
     my $obj = $is_rw->new;
@@ -36,7 +36,7 @@ subtest 'is rw' => sub {
     is $obj->get_prop, 23, 'value after set';
 };
 
-subtest 'is rpo' => sub {
+group 'is rpo' => sub {
     my $is_rpo = TestProperty(is => 'rpo');
     test_accessors($is_rpo, 'prop', 0, 0, 1, 0);
     my $obj = $is_rpo->new(prop => 23);
@@ -46,7 +46,7 @@ subtest 'is rpo' => sub {
     }, qr{cannot be written directly}, 'direct write error';
 };
 
-subtest 'is rpwp' => sub {
+group 'is rpwp' => sub {
     my $is_rpwp = TestProperty(is => 'rpwp');
     test_accessors($is_rpwp, 'prop', 0, 0, 1, 1);
     my $obj = $is_rpwp->new(prop => 23);
@@ -61,7 +61,7 @@ subtest 'is rpwp' => sub {
     }, qr{cannot be written directly}, 'direct write error';
 };
 
-subtest 'is rwp' => sub {
+group 'is rwp' => sub {
     my $is_rwp = TestProperty(is => 'rwp');
     test_accessors($is_rwp, 'prop', 1, 0, 0, 1);
     my $obj = $is_rwp->new(prop => 23);
@@ -74,7 +74,7 @@ subtest 'is rwp' => sub {
     }, qr{cannot be written directly}, 'direct write error';
 };
 
-subtest 'is bare' => sub {
+group 'is bare' => sub {
     my $is_bare = TestProperty(is => 'bare');
     test_accessors($is_bare, 'prop', 0, 0, 0, 0);
     my $obj = $is_bare->new;
@@ -86,7 +86,7 @@ subtest 'is bare' => sub {
     }, qr{cannot be written directly}, 'direct write error';
 };
 
-subtest 'is lazy' => sub {
+group 'is lazy' => sub {
     my $n = 23;
     my $is_lazy = TestProperty(is => 'lazy', default => sub { $n++ });
     test_accessors($is_lazy, 'prop', 0, 0, 0, 0);

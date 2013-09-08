@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'undefined init_arg' => sub {
+group 'undefined init_arg' => sub {
     my $class = TestProperty(
         is => 'ro',
         init_arg => undef,
@@ -17,7 +17,7 @@ subtest 'undefined init_arg' => sub {
         'error thrown with init_arg present';
 };
 
-subtest 'redefined init_arg' => sub {
+group 'redefined init_arg' => sub {
     my $class = TestProperty(
         is => 'ro',
         init_arg => 'value',

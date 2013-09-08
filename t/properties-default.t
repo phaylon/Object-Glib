@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'lazy' => sub {
+group 'lazy' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',
@@ -20,7 +20,7 @@ subtest 'lazy' => sub {
     is $n, 24, 'default only called once';
 };
 
-subtest 'non lazy' => sub {
+group 'non lazy' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',
@@ -33,7 +33,7 @@ subtest 'non lazy' => sub {
     is $n, 24, 'default only called once';
 };
 
-subtest 'constructor override' => sub {
+group 'constructor override' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',
@@ -46,7 +46,7 @@ subtest 'constructor override' => sub {
     is $n, 23, 'default still not called';
 };
 
-subtest 'lazy constructor override' => sub {
+group 'lazy constructor override' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'ro',
@@ -60,7 +60,7 @@ subtest 'lazy constructor override' => sub {
     is $n, 23, 'default still not called';
 };
 
-subtest 'writer override' => sub {
+group 'writer override' => sub {
     my $n = 23;
     my $class = TestProperty(
         is => 'rw',

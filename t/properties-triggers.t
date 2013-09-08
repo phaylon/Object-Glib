@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'trigger options' => sub {
+group 'trigger options' => sub {
     my (@args);
     my ($set, $unset) = (0, 0);
     my $class = TestProperty(

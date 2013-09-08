@@ -8,7 +8,20 @@ use Exporter 'import';
 
 our @EXPORT = qw(
     test_accessors
+    group
 );
+
+sub group {
+    my ($title, $code) = @_;
+    Test::More::note $title;
+    if ($ENV{HARNESS_ACTIVE}) {
+        $code->();
+    }
+    else {
+        Test::More::subtest $title, $code;
+    }
+    return 1;
+}
 
 sub test_accessors {
     my ($class, $name, $r_pub, $w_pub, $r_pri, $w_pri) = @_;

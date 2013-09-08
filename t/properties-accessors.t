@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'reader option' => sub {
+group 'reader option' => sub {
     my $class = TestProperty(is => 'bare', reader => 'prop');
     test_accessors($class, 'prop', 0, 0, 0, 0);
     my $obj = $class->new(prop => 23);
@@ -19,7 +19,7 @@ subtest 'reader option' => sub {
     }, qr{cannot be written directly}, 'direct write error';
 };
 
-subtest 'writer option' => sub {
+group 'writer option' => sub {
     my $class = TestProperty(reader => 'read', writer => 'write');
     test_accessors($class, 'prop', 0, 0, 0, 0);
     my $obj = $class->new;

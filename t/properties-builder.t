@@ -6,8 +6,8 @@ use lib "$FindBin::Bin/lib";
 use Object::Glib::Test;
 use Object::Glib::TestProperty;
 
-subtest 'lazy' => sub {
-    subtest 'auto named' => sub {
+group 'lazy' => sub {
+    group 'auto named' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -21,7 +21,7 @@ subtest 'lazy' => sub {
         is $obj->get_prop, 23, 'value stable';
         is $n, 24, 'builder only called once';
     };
-    subtest 'directly named' => sub {
+    group 'directly named' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -35,7 +35,7 @@ subtest 'lazy' => sub {
         is $obj->get_prop, 23, 'value stable';
         is $n, 24, 'builder only called once';
     };
-    subtest 'installed' => sub {
+    group 'installed' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -61,7 +61,7 @@ subtest 'lazy' => sub {
         is $xobj->get_prop, 23, 'extended calculated';
         is $extended, 1, 'extended builder called';
     };
-    subtest 'constructor override' => sub {
+    group 'constructor override' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -73,7 +73,7 @@ subtest 'lazy' => sub {
         is $obj->get_prop, 42, 'override value';
         is $n, 23, 'builder still not called';
     };
-    subtest 'writer override' => sub {
+    group 'writer override' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'rw',
@@ -88,8 +88,8 @@ subtest 'lazy' => sub {
     };
 };
 
-subtest 'non lazy' => sub {
-    subtest 'auto named' => sub {
+group 'non lazy' => sub {
+    group 'auto named' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -102,7 +102,7 @@ subtest 'non lazy' => sub {
         is $obj->get_prop, 23, 'value stable';
         is $n, 24, 'builder only called once';
     };
-    subtest 'directly named' => sub {
+    group 'directly named' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -115,7 +115,7 @@ subtest 'non lazy' => sub {
         is $obj->get_prop, 23, 'value stable';
         is $n, 24, 'builder only called once';
     };
-    subtest 'installed' => sub {
+    group 'installed' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
@@ -141,7 +141,7 @@ subtest 'non lazy' => sub {
         is $n, 24, 'extended builder was run';
         is $xobj->get_prop, 23, 'extended calculated';
     };
-    subtest 'constructor override' => sub {
+    group 'constructor override' => sub {
         my $n = 23;
         my $class = TestProperty(
             is => 'ro',
