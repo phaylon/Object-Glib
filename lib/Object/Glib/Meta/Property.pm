@@ -28,6 +28,7 @@ has setter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has getter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has init_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has pspec => (is => 'lazy', init_arg => undef);
+has _property_signals => (is => 'lazy', init_arg => undef);
 
 has mode => (is => 'ro', default => sub { MODE_BARE }, init_arg => 'is');
 has writable => (is => 'ro', lazy => 1, builder => 1);
@@ -37,8 +38,8 @@ has writer => (is => 'ro', lazy => 1, builder => 1);
 has init_arg => (is => 'ro', lazy => 1, builder => 1);
 has lazy => (is => 'ro', lazy => 1, builder => 1);
 has builder => (is => 'ro', lazy => 1, builder => 1);
-has default => (is => 'ro', lazy => 1);
-has constraint => (is => 'ro', init_arg => 'isa');
+has default => (is => 'ro', lazy => 1, builder => 1);
+has constraint => (is => 'ro', init_arg => 'isa', builder => 1);
 has coercion => (is => 'ro', init_arg => 'coerce');
 has clearer => (is => 'ro');
 has trigger_set => (is => 'ro', init_arg => 'on_set');
@@ -54,7 +55,15 @@ sub BUILD {
         if $self->required and defined $self->builder;
     croak q{A required property needs an init_arg}
         if $self->required and not defined $self->init_arg;
+    $self->_check_property_signals;
 }
+
+sub _build_constraint { undef }
+sub _build_default { undef }
+sub _build__property_signals { [] }
+
+sub _check_property_signals { 1 }
+sub property_signals { @{ $_[0]->_property_signals } }
 
 sub install_into {
     my ($self, $meta) = @_;

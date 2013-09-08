@@ -123,7 +123,10 @@ sub register {
 
 sub signals {
     my ($self) = @_;
-    return values %{ $self->_signals };
+    return(
+        (values %{ $self->_signals }),
+        (map { ($_->property_signals) } $self->properties),
+    );
 }
 
 sub properties {

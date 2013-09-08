@@ -6,6 +6,7 @@ use Sub::Install qw( install_sub );
 use Object::Glib::Registry qw( find_meta register_meta );
 use Class::Method::Modifiers ();
 use Import::Into;
+use Module::Runtime qw( use_module );
 
 use aliased 'Object::Glib::Meta::Class';
 use aliased 'Object::Glib::Meta::Property';
