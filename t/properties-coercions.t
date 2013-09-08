@@ -18,7 +18,7 @@ group 'coerce option' => sub {
         'coerced on construct';
     is $call, 1, 'coercion called';
     like exception { $class->new(prop => 0) },
-        qr{Property 'prop' initialisation error: FAIL},
+        qr{Property 'prop' value error: FAIL},
         'coerce failure on construct';
     is $call, 2, 'coercion called once';
     $call = 0;
@@ -27,7 +27,7 @@ group 'coerce option' => sub {
     is_deeply $obj->get_prop, [42], 'correct value';
     is $call, 1, 'check called on write';
     like exception { $obj->set_prop(0) },
-        qr{Property 'prop' initialisation error: FAIL},
+        qr{Property 'prop' value error: FAIL},
         'coerce failure on write';
 };
 

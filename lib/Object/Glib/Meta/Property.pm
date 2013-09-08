@@ -5,6 +5,7 @@ use Moo;
 use Glib;
 use Carp qw( croak );
 use Try::Tiny;
+use Safe::Isa;
 
 use constant {
     MODE_READ => 'ro',
@@ -40,6 +41,7 @@ has lazy => (is => 'ro', lazy => 1, builder => 1);
 has builder => (is => 'ro', lazy => 1, builder => 1);
 has default => (is => 'ro', lazy => 1, builder => 1);
 has constraint => (is => 'ro', init_arg => 'isa', builder => 1);
+has class_constraint => (is => 'ro', init_arg => 'class');
 has coercion => (is => 'ro', init_arg => 'coerce');
 has clearer => (is => 'ro');
 has trigger_set => (is => 'ro', init_arg => 'on_set');
@@ -58,7 +60,19 @@ sub BUILD {
     $self->_check_property_signals;
 }
 
-sub _build_constraint { undef }
+sub _build_constraint {
+    my ($self) = @_;
+    if (defined( my $class = $self->class_constraint )) {
+        return sub {
+            my $val = $_[0];
+            die "Not an instance of $class\n"
+                unless $val->$_isa($class);
+            return 1;
+        };
+    }
+    return undef;
+}
+
 sub _build_default { undef }
 sub _build__property_signals { [] }
 
@@ -196,7 +210,7 @@ sub _build_setter_ref {
         catch {
             my $err = $_;
             chomp $err;
-            croak qq{Property '$name' initialisation error: $err};
+            croak qq{Property '$name' value error: $err};
         };
         return 1;
     };

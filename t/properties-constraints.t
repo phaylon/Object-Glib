@@ -17,7 +17,7 @@ group 'isa option' => sub {
     is $class->new(prop => 23)->get_prop, 23, 'check passed';
     is $call, 1, 'constraint called';
     like exception { $class->new(prop => 0) },
-        qr{Property 'prop' initialisation error: FAIL},
+        qr{Property 'prop' value error: FAIL},
         'check failed';
     is $call, 2, 'constraint called once';
     $call = 0;
@@ -26,8 +26,23 @@ group 'isa option' => sub {
     is $call, 1, 'check called on write';
     is $obj->get_prop, 42, 'correct value';
     like exception { $obj->set_prop(0) },
-        qr{Property 'prop' initialisation error: FAIL},
+        qr{Property 'prop' value error: FAIL},
         'check failed on write';
+};
+
+group 'class option' => sub {
+    my $class = TestProperty(
+        is => 'rw',
+        class => 'TestObject',
+    );
+    my $obj = $class->new;
+    is $obj->set_prop(bless {}, 'TestObject'), 1, 'correct class';
+    like exception { $obj->set_prop(bless {}, 'WrongObject') },
+        qr{Property 'prop' value error: Not an instance of TestObject},
+        'wrong class';
+    like exception { $obj->set_prop([]) },
+        qr{Property 'prop' value error: Not an instance of TestObject},
+        'non object';
 };
 
 done_testing;

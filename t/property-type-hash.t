@@ -12,7 +12,7 @@ group 'default isa check' => sub {
         { x => 23 },
         'valid init argument';
     like exception { $class->new(prop => 23) },
-        qr{Property 'prop' initialisation error: Not a hash reference},
+        qr{Property 'prop' value error: Not a hash reference},
         'invalid init argument type';
 };
 
