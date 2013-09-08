@@ -217,4 +217,115 @@ group 'clone' => sub {
     is_deeply $obj->get_prop, { x => 23, y => 17 }, 'shallow_clone()';
 };
 
+group 'constraints' => sub {
+    group 'item_isa' => sub {
+        my $class = TestProperty(
+            type => 'Hash',
+            is => 'ro',
+            item_isa => sub { die "FAIL\n" if ref $_[0] },
+            handles => {
+                prop_set_all => 'set_all',
+                prop_set => 'set',
+                prop_get_x => ['get', 'x'],
+            },
+        );
+        group 'construct' => sub {
+            is $class->new(prop => { x => 23 })->prop_get_x, 23,
+                'correct value';
+            like exception { $class->new(prop => { x => [] }) },
+                qr{Property 'prop' value error: Item 'x': FAIL},
+                'wrong value';
+        };
+        group 'set_all' => sub { 
+            my $obj = $class->new;
+            is $obj->prop_set_all('x', 23), 1, 'correct value';
+            like exception { $obj->prop_set_all(x => 17, y => []) },
+                qr{Property 'prop' item 'y' value error: FAIL},
+                'wrong value';
+            is_deeply $obj->get_prop, { x => 23 }, 'consistency';
+        };
+        group 'set' => sub { 
+            my $obj = $class->new;
+            is $obj->prop_set('x', 23), 1, 'correct value';
+            like exception { $obj->prop_set(y => []) },
+                qr{Property 'prop' item 'y' value error: FAIL},
+                'wrong value';
+            is_deeply $obj->get_prop, { x => 23 }, 'consistency';
+        };
+    };
+    group 'item_class' => sub {
+        my $class = TestProperty(
+            type => 'Hash',
+            is => 'ro',
+            item_class => 'TestObject',
+            handles => {
+                prop_set_x => ['set', 'x'],
+                prop_get_x => ['get', 'x'],
+            },
+        );
+        my $ok = bless {}, 'TestObject';
+        my $err = bless {}, 'WrongObject';
+        group 'construct' => sub {
+            is exception { $class->new(prop => { x => $ok }) },
+                undef,
+                'correct class';
+            like exception { $class->new(prop => { x => $err }) },
+                qr{Property 'prop' value error: Item 'x': Not an instance},
+                'wrong class';
+        };
+        group 'set' => sub { 
+            my $obj = $class->new;
+            is $obj->prop_set_x($ok), 1, 'correct class';
+            like exception { $obj->prop_set_x($err) },
+                qr{Property 'prop' item 'x' value error: Not an instance},
+                'wrong class';
+        };
+    };
+};
+
+group 'coercions' => sub {
+    my $class = TestProperty(
+        type => 'Hash',
+        is => 'ro',
+        item_coerce => sub {
+            die "FAIL\n" if ref $_[0];
+            return $_[0] * 2;
+        },
+        handles => {
+            prop_set_x => ['set', 'x'],
+            prop_get_x => ['get', 'x'],
+            prop_set_all => 'set_all',
+        },
+    );
+    group 'construct' => sub {
+        is exception {
+            my $obj = $class->new(prop => { x => 23 });
+            is $obj->prop_get_x, 46, 'coercion applied';
+        }, undef, 'no errors for correct value';
+        like exception { $class->new(prop => { x => [] }) },
+            qr{Property 'prop' value error: Item 'x': FAIL},
+            'coercion error';
+    };
+    group 'set' => sub {
+        my $obj = $class->new;
+        is exception {
+            is $obj->prop_set_x(17), 1, 'correct value return';
+            is $obj->prop_get_x, 34, 'coercion applied';
+        }, undef, 'no errors for correct value';
+        like exception { $obj->prop_set_x([]) },
+            qr{Property 'prop' item 'x' value error: FAIL},
+            'coercion error';
+    };
+    group 'set_all' => sub {
+        my $obj = $class->new;
+        is exception {
+            is $obj->prop_set_all(x => 17), 1, 'correct value return';
+            is $obj->prop_get_x, 34, 'coercion applied';
+        }, undef, 'no errors for correct value';
+        like exception { $obj->prop_set_all(x => []) },
+            qr{Property 'prop' item 'x' value error: FAIL},
+            'coercion error';
+    };
+};
+
 done_testing;

@@ -80,6 +80,4 @@ sub _install_delegations_into {
     return 1;
 }
 
-
-
 1;

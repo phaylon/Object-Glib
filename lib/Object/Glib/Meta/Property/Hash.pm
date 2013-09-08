@@ -11,9 +11,6 @@ use namespace::clean;
 
 extends 'Object::Glib::Meta::Property';
 
-has item_constraint => (is => 'ro', init_arg => 'item_isa');
-has item_coercion => (is => 'ro', init_arg => 'item_coerce');
-
 sub _build__property_signals {
     my ($self) = @_;
     return [
@@ -44,11 +41,53 @@ sub _build_signal_formats {
 
 sub _build_constraint {
     my ($self) = @_;
+    my $item_check = $self->item_constraint;
     return sub {
         my ($value) = @_;
         die "Not a hash reference\n"
             unless ref $value eq 'HASH';
+        return 1
+            unless $item_check;
+        my $last;
+        try {
+            for my $key (keys %$value) {
+                $last = $key;
+                $item_check->($value->{ $key });
+            }
+        }
+        catch {
+            my $err = $_;
+            chomp $err;
+            die "Item '$last': $err\n";
+        };
         return 1;
+    };
+}
+
+sub _build_coercion {
+    my ($self) = @_;
+    my $item_coerce = $self->item_coercion;
+    return undef
+        unless $item_coerce;
+    return sub {
+        my ($value) = @_;
+        die "Not a hash reference\n"
+            unless ref $value eq 'HASH';
+        my $last;
+        try {
+            my %clean;
+            for my $key (keys %$value) {
+                $last = $key;
+                $clean{ $key } = $item_coerce->($value->{ $key });
+            }
+            $value = \%clean;
+        }
+        catch {
+            my $err = $_;
+            chomp $err;
+            die "Item '$last': $err\n";
+        };
+        return $value;
     };
 }
 
@@ -272,7 +311,7 @@ sub _generate_shallow_clone_delegation {
 }
 
 with qw(
-    Object::Glib::Meta::Property::Typed::Primitive
+    Object::Glib::Meta::Property::Typed::Container
 );
 
 1;
