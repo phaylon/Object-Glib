@@ -11,6 +11,11 @@ use namespace::clean;
 
 extends 'Object::Glib::Meta::Property';
 
+our @CARP_NOT = qw(
+    Object::Glib
+    Object::Glib::Meta::Class
+);
+
 sub _build_property_signals {
     my ($self) = @_;
     return [

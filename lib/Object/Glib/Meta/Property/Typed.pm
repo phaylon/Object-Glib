@@ -12,6 +12,11 @@ requires qw(
     _install_delegation_method
 );
 
+our @CARP_NOT = qw(
+    Object::Glib
+    Object::Glib::Meta::Class
+);
+
 has handles => (is => 'ro', default => sub { {} });
 has signals => (is => 'ro', default => sub { {} });
 has signal_base => (is => 'ro', builder => 1, lazy => 1);

@@ -10,6 +10,11 @@ use namespace::clean;
 
 extends 'Object::Glib::Meta::Property';
 
+our @CARP_NOT = qw(
+    Object::Glib
+    Object::Glib::Meta::Class
+);
+
 has class_constraint => (
     is => 'ro',
     isa => \&maybe_class,

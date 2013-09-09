@@ -6,6 +6,11 @@ use Moo::Role;
 
 use namespace::clean;
 
+our @CARP_NOT = qw(
+    Object::Glib
+    Object::Glib::Meta::Class
+);
+
 sub _install_delegation_method {
     my ($self, $meta, $as, $target, @curry) = @_;
     my $method = "_generate_${target}_delegation";
