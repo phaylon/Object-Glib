@@ -8,6 +8,8 @@ use namespace::clean;
 
 requires qw(
     _build_typed_builder
+    _build_signal_formats
+    _install_delegation_method
 );
 
 has handles => (is => 'ro', default => sub { {} });

@@ -6,8 +6,10 @@ use Glib;
 use Carp qw( croak );
 use Try::Tiny;
 use Safe::Isa;
+use Object::Glib::Types qw( :ident :ref );
 
-use constant {
+my $_mode_map;
+use constant $_mode_map = {
     MODE_READ => 'ro',
     MODE_READP => 'rpo',
     MODE_READ_WRITE => 'rw',
@@ -16,6 +18,7 @@ use constant {
     MODE_BARE => 'bare',
     MODE_LAZY => 'lazy',
 };
+my %_allowed_mode = reverse %$_mode_map;
 
 use namespace::clean;
 
@@ -24,29 +27,164 @@ our @CARP_NOT = qw(
     Object::Glib::Meta::Class
 );
 
-has name => (is => 'ro', required => 1);
+has name => (is => 'ro', required => 1, isa => \&isa_ident);
 has setter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has getter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has init_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has pspec => (is => 'lazy', init_arg => undef);
-has _property_signals => (is => 'lazy', init_arg => undef);
 
-has mode => (is => 'ro', default => sub { MODE_BARE }, init_arg => 'is');
-has writable => (is => 'ro', lazy => 1, builder => 1);
-has readable => (is => 'ro', lazy => 1, builder => 1);
-has reader => (is => 'ro', lazy => 1, builder => 1);
-has writer => (is => 'ro', lazy => 1, builder => 1);
-has init_arg => (is => 'ro', lazy => 1, builder => 1);
-has lazy => (is => 'ro', lazy => 1, builder => 1);
-has builder => (is => 'ro', lazy => 1, builder => 1);
-has default => (is => 'ro', lazy => 1, builder => 1);
-has constraint => (is => 'lazy', init_arg => 'isa');
-has coercion => (is => 'lazy', init_arg => 'coerce');
-has clearer => (is => 'ro');
-has trigger_set => (is => 'ro', init_arg => 'on_set');
-has trigger_unset => (is => 'ro', init_arg => 'on_unset');
 has required => (is => 'ro');
-has predicate => (is => 'ro');
+has clearer => (is => 'ro', isa => \&isa_auto_ident);
+has predicate => (is => 'ro', isa => \&isa_auto_ident);
+
+has property_signals => (
+    is => 'bare',
+    lazy => 1,
+    reader => '_property_signals',
+    init_arg => undef,
+    builder => sub { [] },
+);
+
+has default => (
+    is => 'ro',
+    isa => \&maybe_code,
+    lazy => 1,
+    builder => sub { undef },
+);
+
+has constraint => (
+    is => 'ro',
+    isa => \&maybe_code,
+    lazy => 1,
+    init_arg => 'isa',
+    builder => sub { undef },
+);
+
+has coercion => (
+    is => 'ro',
+    isa => \&maybe_code,
+    lazy => 1,
+    init_arg => 'coerce',
+    builder => sub { undef },
+);
+
+my %_mode_readable = map { ($_, 1) } (
+    MODE_READ, MODE_READ_WRITE, MODE_READ_WRITEP,
+);
+
+has readable => (
+    is => 'ro',
+    lazy => 1,
+    builder => sub { $_mode_readable{ $_[0]->mode } ? 1 : 0 },
+);
+
+my %_mode_writable = map { ($_, 1) } (
+    MODE_READ_WRITE,
+);
+
+has writable => (
+    is => 'ro',
+    lazy => 1,
+    builder => sub { $_mode_writable{ $_[0]->mode } ? 1 : 0 },
+);
+
+has lazy => (
+    is => 'ro',
+    lazy => 1,
+    builder => sub { $_[0]->mode eq MODE_LAZY ? 1 : 0 },
+);
+
+has mode => (
+    is => 'ro',
+    isa => sub {
+        die sprintf "The 'is' option must be one of %s\n",
+            join ', ', keys %_allowed_mode
+            unless $_allowed_mode{ $_[0] };
+    },
+    default => sub { MODE_BARE },
+    init_arg => 'is',
+);
+
+my %_reader_format = (
+    (map { ($_, 'get_%s') }
+        MODE_READ,
+        MODE_READ_WRITE,
+        MODE_READ_WRITEP,
+    ),
+    (map { ($_, '_get_%s') }
+        MODE_READP,
+        MODE_READP_WRITEP,
+    ),
+);
+
+has reader => (
+    is => 'ro',
+    isa => \&maybe_ident,
+    lazy => 1,
+    builder => sub {
+        my ($self) = @_;
+        my $mode = $self->mode;
+        return sprintf $_reader_format{ $mode }, $self->name
+            if exists $_reader_format{ $mode };
+        return undef;
+    },
+);
+
+my %_writer_format = (
+    (map { ($_, 'set_%s') }
+        MODE_READ_WRITE,
+    ),
+    (map { ($_, '_set_%s') }
+        MODE_READ_WRITEP,
+        MODE_READP_WRITEP,
+    ),
+);
+
+has writer => (
+    is => 'ro',
+    isa => \&maybe_ident,
+    lazy => 1,
+    builder => sub {
+        my ($self) = @_;
+        my $mode = $self->mode;
+        return sprintf $_writer_format{ $mode }, $self->name
+            if exists $_writer_format{ $mode };
+        return undef;
+    },
+);
+
+has init_arg => (
+    is => 'ro',
+    isa => \&maybe_ident,
+    lazy => 1,
+    builder => sub { $_[0]->name },
+);
+
+has builder => (
+    is => 'ro',
+    isa => \&maybe_code_ident,
+    lazy => 1,
+    builder => sub {
+        return 1 if $_[0]->lazy and not $_[0]->default;
+        return undef;
+    },
+);
+
+has trigger_set => (
+    is => 'ro',
+    isa => \&isa_auto_ident,
+    init_arg => 'on_set',
+);
+
+has trigger_unset => (
+    is => 'ro',
+    isa => \&isa_auto_ident,
+    init_arg => 'on_unset',
+);
+
+sub _check_property_signals { 1 }
+sub _builder_real { $_[0]->_autom($_[0]->builder, '_build_%s', 1) }
+sub property_signals { @{ $_[0]->_property_signals } }
 
 sub BUILD {
     my ($self) = @_;
@@ -58,15 +196,6 @@ sub BUILD {
         if $self->required and not defined $self->init_arg;
     $self->_check_property_signals;
 }
-
-sub _build_constraint { undef }
-sub _build_coercion { undef }
-
-sub _build_default { undef }
-sub _build__property_signals { [] }
-
-sub _check_property_signals { 1 }
-sub property_signals { @{ $_[0]->_property_signals } }
 
 sub install_into {
     my ($self, $meta) = @_;
@@ -149,25 +278,6 @@ sub _autom {
     return $value;
 }
 
-sub _build_lazy {
-    my ($self) = @_;
-    return 1
-        if $self->mode eq MODE_LAZY;
-    return 0;
-}
-
-sub _build_builder {
-    my ($self) = @_;
-    return 1
-        if $self->lazy and not $self->default;
-    return undef;
-}
-
-sub _build_init_arg {
-    my ($self) = @_;
-    return $self->name;
-}
-
 sub _build_setter_ref {
     my ($self) = @_;
     my $name = $self->name;
@@ -204,8 +314,6 @@ sub _build_setter_ref {
         return 1;
     };
 }
-
-sub _builder_real { $_[0]->_autom($_[0]->builder, '_build_%s', 1) }
 
 sub _build_init_ref {
     my ($self) = @_;
@@ -267,50 +375,6 @@ sub _build_getter_ref {
             return undef;
         };
     }
-}
-
-sub _build_reader {
-    my ($self) = @_;
-    my $name = $self->name;
-    my $mode = $self->mode;
-    return "get_$name"
-        if $mode eq MODE_READ
-        or $mode eq MODE_READ_WRITE
-        or $mode eq MODE_READ_WRITEP;
-    return "_get_$name"
-        if $mode eq MODE_READP
-        or $mode eq MODE_READP_WRITEP;
-    return undef;
-}
-
-sub _build_writer {
-    my ($self) = @_;
-    my $name = $self->name;
-    my $mode = $self->mode;
-    return "set_$name"
-        if $mode eq MODE_READ_WRITE;
-    return "_set_$name"
-        if $mode eq MODE_READ_WRITEP
-        or $mode eq MODE_READP_WRITEP;
-    return undef;
-}
-
-my %_mode_readable = map { ($_, 1) } (
-    MODE_READ, MODE_READ_WRITE, MODE_READ_WRITEP,
-);
-
-my %_mode_writable = map { ($_, 1) } (
-    MODE_READ_WRITE,
-);
-
-sub _build_readable {
-    my ($self) = @_;
-    return $_mode_readable{ $self->mode };
-}
-
-sub _build_writable {
-    my ($self) = @_;
-    return $_mode_writable{ $self->mode };
 }
 
 sub _build_pspec {

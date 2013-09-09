@@ -4,12 +4,18 @@ package Object::Glib::Meta::Property::Object;
 use Moo;
 use Safe::Isa;
 use Scalar::Util qw( blessed );
+use Object::Glib::Types qw( :oo );
 
 use namespace::clean;
 
 extends 'Object::Glib::Meta::Property';
 
-has class_constraint => (is => 'ro', init_arg => 'class');
+has class_constraint => (
+    is => 'ro',
+    isa => \&maybe_class,
+    init_arg => 'class',
+    builder => sub { undef },
+);
 
 sub _build_signal_formats { {} }
 sub _build_typed_builder { undef }

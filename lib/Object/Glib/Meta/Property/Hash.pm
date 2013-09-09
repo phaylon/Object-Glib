@@ -11,7 +11,7 @@ use namespace::clean;
 
 extends 'Object::Glib::Meta::Property';
 
-sub _build__property_signals {
+sub _build_property_signals {
     my ($self) = @_;
     return [
         defined($self->signals->{insert}) ? Signal->new(
