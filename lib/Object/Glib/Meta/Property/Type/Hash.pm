@@ -1,20 +1,16 @@
 use strictures 1;
 
-package Object::Glib::Meta::Property::Hash;
+package Object::Glib::Meta::Property::Type::Hash;
 use Moo;
 use Carp qw( croak );
 use Try::Tiny;
+use Object::Glib::CarpGroup;
 
 use aliased 'Object::Glib::Meta::Signal';
 
 use namespace::clean;
 
 extends 'Object::Glib::Meta::Property';
-
-our @CARP_NOT = qw(
-    Object::Glib
-    Object::Glib::Meta::Class
-);
 
 sub _build_property_signals {
     my ($self) = @_;
@@ -96,8 +92,40 @@ sub _build_coercion {
     };
 }
 
+sub _generate_map_pairs_delegation {
+    my ($self, $meta, @curry) = @_;
+    my $name = $self->name;
+    my $get = $self->getter_ref;
+    return sub {
+        my $instance = shift;
+        my ($code, @args) = (@curry, @_);
+        my $hash = $instance->$get;
+        return
+            map { $code->(@$_, @args) }
+            map { [$_, $hash->{ $_ }] }
+            keys %$hash;
+    };
+}
+
+sub _generate_each_value_delegation {
+    my ($self, $meta, @curry) = @_;
+    my $name = $self->name;
+    my $get = $self->getter_ref;
+    return sub {
+        my $instance = shift;
+        my ($code, @args) = (@curry, @_);
+        my $hash = $instance->$get;
+        my @vals = values %$hash;
+        for my $value (@vals) {
+            local $_ = $value;
+            $code->($value, @args);
+        }
+        return 1;
+    };
+}
+
 sub _generate_keys_delegation {
-    my ($self) = @_;
+    my ($self, $meta) = @_;
     my $name = $self->name;
     my $get = $self->getter_ref;
     return sub {
@@ -106,7 +134,7 @@ sub _generate_keys_delegation {
 }
 
 sub _generate_values_delegation {
-    my ($self) = @_;
+    my ($self, $meta) = @_;
     my $name = $self->name;
     my $get = $self->getter_ref;
     return sub {
@@ -115,7 +143,7 @@ sub _generate_values_delegation {
 }
 
 sub _generate_kv_delegation {
-    my ($self) = @_;
+    my ($self, $meta) = @_;
     my $name = $self->name;
     my $get = $self->getter_ref;
     return sub {
@@ -125,7 +153,7 @@ sub _generate_kv_delegation {
 }
 
 sub _generate_get_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $name = $self->name;
     my $get = $self->getter_ref;
     return sub {
@@ -135,8 +163,22 @@ sub _generate_get_delegation {
     };
 }
 
+sub _generate_get_required_delegation {
+    my ($self, $meta, @curry) = @_;
+    my $name = $self->name;
+    my $get = $self->getter_ref;
+    return sub {
+        my $instance = shift;
+        my ($key) = (@curry, @_);
+        my $hash = $instance->$get;
+        croak qq{Unknown $name key '$key'}
+            unless exists $hash->{ $key };
+        return $hash->{ $key };
+    };
+}
+
 sub _generate_get_all_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $name = $self->name;
     my $get = $self->getter_ref;
     return sub {
@@ -168,8 +210,38 @@ sub _make_item_setter {
     };
 }
 
+sub _generate_get_buildable_delegation {
+    my ($self, $meta, @curry) = @_;
+    my $name = $self->name;
+    my $get = $self->getter_ref;
+    my $set = $self->_make_item_setter;
+    my $coerce = $self->item_coercion;
+    my $check = $self->item_constraint;
+    return sub {
+        my $instance = shift;
+        my ($builder, $key, @args) = (@curry, @_);
+        my $hash = $instance->$get;
+        return $hash->{ $key }
+            if exists $hash->{ $key };
+        my $value = $instance->$builder($key);
+        try {
+            $value = $coerce->($value)
+                if $coerce;
+            $check->($value)
+                if $check;
+        }
+        catch {
+            my $err = $_;
+            chomp $err;
+            croak qq{Property '$name' item '$key' value error: $err};
+        };
+        $instance->$set($key, $value, @args);
+        return $value;
+    };
+}
+
 sub _generate_set_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $name = $self->name;
     my $set = $self->_make_item_setter;
     my $coerce = $self->item_coercion;
@@ -194,7 +266,7 @@ sub _generate_set_delegation {
 }
 
 sub _generate_set_all_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $name = $self->name;
     my $set = $self->_make_item_setter;
     my $coerce = $self->item_coercion;
@@ -220,7 +292,7 @@ sub _generate_set_all_delegation {
             chomp $err;
             croak qq{Property '$name' item '$last' value error: $err};
         };
-        for my $key (sort keys %kv) {
+        for my $key (keys %kv) {
             $instance->$set($key, $kv{ $key });
         }
         return 1;
@@ -246,7 +318,7 @@ sub _make_clearer {
 }
 
 sub _generate_delete_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $clear = $self->_make_clearer;
     return sub {
         my $instance = shift;
@@ -256,7 +328,7 @@ sub _generate_delete_delegation {
 }
 
 sub _generate_delete_all_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $clear = $self->_make_clearer;
     return sub {
         my $instance = shift;
@@ -267,20 +339,20 @@ sub _generate_delete_all_delegation {
 }
 
 sub _generate_clear_delegation {
-    my ($self) = @_;
+    my ($self, $meta) = @_;
     my $clear = $self->_make_clearer;
     my $get = $self->getter_ref;
     return sub {
         my $instance = shift;
         my $hash = $instance->$get;
         $instance->$clear($_)
-            for sort keys %$hash;
+            for keys %$hash;
         return 1;
     };
 }
 
 sub _generate_exists_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $get = $self->getter_ref;
     return sub {
         my $instance = shift;
@@ -290,7 +362,7 @@ sub _generate_exists_delegation {
 }
 
 sub _generate_defined_delegation {
-    my ($self, @curry) = @_;
+    my ($self, $meta, @curry) = @_;
     my $get = $self->getter_ref;
     return sub {
         my $instance = shift;
@@ -300,7 +372,7 @@ sub _generate_defined_delegation {
 }
 
 sub _generate_count_delegation {
-    my ($self) = @_;
+    my ($self, $meta) = @_;
     my $get = $self->getter_ref;
     return sub {
         return scalar keys %{ $_[0]->$get };
@@ -308,7 +380,7 @@ sub _generate_count_delegation {
 }
 
 sub _generate_shallow_clone_delegation {
-    my ($self) = @_;
+    my ($self, $meta) = @_;
     my $get = $self->getter_ref;
     return sub {
         return { %{ $_[0]->$get } };

@@ -3,10 +3,12 @@ use strictures 1;
 package Object::Glib::Meta::Property;
 use Moo;
 use Glib;
-use Carp qw( croak );
+use Carp qw( croak confess );
 use Try::Tiny;
 use Safe::Isa;
 use Object::Glib::Types qw( :ident :ref );
+use Object::Glib::Values qw( identify );
+use Object::Glib::CarpGroup;
 
 my $_mode_map;
 use constant $_mode_map = {
@@ -21,11 +23,6 @@ use constant $_mode_map = {
 my %_allowed_mode = reverse %$_mode_map;
 
 use namespace::clean;
-
-our @CARP_NOT = qw(
-    Object::Glib
-    Object::Glib::Meta::Class
-);
 
 has name => (is => 'ro', required => 1, isa => \&isa_ident);
 has setter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
@@ -97,9 +94,10 @@ has lazy => (
 has mode => (
     is => 'ro',
     isa => sub {
-        die sprintf "The 'is' option must be one of %s\n",
-            join ', ', keys %_allowed_mode
-            unless $_allowed_mode{ $_[0] };
+        die sprintf "Expected one of %s, received %s\n",
+            join(', ', keys %_allowed_mode),
+            identify($_[0])
+            unless defined $_[0] and $_allowed_mode{ $_[0] };
     },
     default => sub { MODE_BARE },
     init_arg => 'is',
@@ -190,10 +188,14 @@ sub BUILD {
     my ($self) = @_;
     croak q{A defaulted property cannot be required}
         if $self->required and defined $self->default;
-    croak q{A built property cannot be required}
-        if $self->required and defined $self->builder;
     croak q{A required property needs an init_arg}
         if $self->required and not defined $self->init_arg;
+    croak q{A property cannot have a default and a builder}
+        if defined $self->builder and defined $self->default;
+    croak q{A lazy property needs a builder or default}
+        if $self->lazy and not(
+            defined $self->builder or defined $self->default
+        );
     $self->_check_property_signals;
 }
 
@@ -326,9 +328,21 @@ sub _build_init_ref {
         if $lazy or not defined($get);
     my $set = $self->_autom($self->trigger_set, '_on_%s_set');
     my $on_set = defined $set;
+    my $check = $self->constraint;
     return sub {
         my ($instance) = @_;
         my $value = $instance->$get;
+        try {
+            $check->($value)
+                if $check;
+        }
+        catch {
+            my $err = $_;
+            chomp $err;
+            croak join ' ',
+                qq{Property '$name' construction initialisation},
+                qq{error: $err};
+        };
         $instance->{ $name } = \$value;
         if ($on_set) {
             $instance->$set(${ $instance->{ $name } });
@@ -343,21 +357,29 @@ sub _build_getter_ref {
     my $lazy = $self->lazy;
     my $builder = $self->_builder_real;
     my $default = $self->default;
-    croak qq{Property '$name' cannot have default and builder}
-        if defined $builder and defined $default;
     if ($lazy) {
-        croak qq{Property '$name' is lazy but has no builder or default}
-            unless defined $builder or defined $default;
         my $get = defined($builder) ? $builder : $default;
         my $set = $self->_autom($self->trigger_set, '_on_%s_set');
         my $on_set = defined $set;
         my $pspec = $self->pspec;
+        my $check = $self->constraint;
         return sub {
             my ($instance) = @_;
-            if ($instance->{$name}) {
+            if ($instance->{ $name }) {
                 return ${ $instance->{ $name } };
             }
             my $value = $instance->$get;
+            try {
+                $check->($value)
+                    if $check;
+            }
+            catch {
+                my $err = $_;
+                chomp $err;
+                croak join ' ',
+                    qq{Property '$name' lazy initialisation},
+                    qq{error: $err};
+            };
             $instance->{ $name } = \$value;
             if ($on_set) {
                 $instance->$set(${ $instance->{ $name } });

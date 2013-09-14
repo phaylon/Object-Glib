@@ -2,6 +2,8 @@ use strictures 1;
 
 package Object::Glib::Meta::Property::Typed;
 use Carp qw( croak );
+use Object::Glib::Types qw( :ref :ident );
+use Object::Glib::CarpGroup;
 use Moo::Role;
 
 use namespace::clean;
@@ -12,15 +14,30 @@ requires qw(
     _install_delegation_method
 );
 
-our @CARP_NOT = qw(
-    Object::Glib
-    Object::Glib::Meta::Class
+has signal_formats => (
+    is => 'ro',
+    init_arg => undef,
+    builder => 1,
 );
 
-has handles => (is => 'ro', default => sub { {} });
-has signals => (is => 'ro', default => sub { {} });
-has signal_base => (is => 'ro', builder => 1, lazy => 1);
-has signal_formats => (is => 'ro', init_arg => undef, builder => 1);
+has handles => (
+    is => 'ro',
+    isa => \&isa_hash_or_array,
+    default => sub { {} },
+);
+
+has signals => (
+    is => 'ro',
+    isa => \&isa_hash,
+    default => sub { {} },
+);
+
+has signal_base => (
+    is => 'ro',
+    isa => \&isa_ident,
+    lazy => 1,
+    builder => sub { $_[0]->name },
+);
 
 around _build_builder => sub {
     my ($orig, $self) = @_;
@@ -29,8 +46,6 @@ around _build_builder => sub {
         if not($value) and not(defined $self->default);
     return $value;
 };
-
-sub _build_signal_base { $_[0]->name }
 
 after install_into => sub {
     my ($self, $meta) = @_;
@@ -55,6 +70,8 @@ sub _signal_name {
     my $value = $self->signals->{ $id };
     $value = sprintf $self->signal_formats->{ $id }, $self->signal_base
         if $value eq 1;
+    croak qq{Invalid signal name '$value'}
+        unless is_ident($value);
     return $value;
 }
 
@@ -64,14 +81,14 @@ sub _install_delegations_into {
     if (ref $handles eq 'ARRAY') {
         $handles = { (map { ($_, $_) } @$handles) };
     }
-    croak join ' ',
-        q{Property 'handles' attribute needs to be},
-        q{array or hash reference},
-        unless ref $handles eq 'HASH';
     for my $as (keys %$handles) {
         my $target = $handles->{ $as };
         my ($method, @curry);
         if (ref $target eq 'ARRAY') {
+            croak join ' ',
+                q{Curried delegation needs to contain at least},
+                q{the name of the target method},
+                unless @$target;
             ($method, @curry) = @$target;
         }
         elsif (not ref $target and defined $target) {
@@ -82,6 +99,10 @@ sub _install_delegations_into {
                 q{Delegation target needs to be string},
                 q{or array reference};
         }
+        croak q{Invalid delegation method name}
+            unless is_ident($as);
+        croak q{Invalid delegation target name}
+            unless is_ident($method);
         $self->_install_delegation_method($meta, $as, $method, @curry);
     }
     return 1;

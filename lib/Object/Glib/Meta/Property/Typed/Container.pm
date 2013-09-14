@@ -3,6 +3,7 @@ use strictures 1;
 package Object::Glib::Meta::Property::Typed::Container;
 use Safe::Isa;
 use Object::Glib::Types qw( :ref :oo );
+use Object::Glib::CarpGroup;
 use Moo::Role;
 
 use namespace::clean;

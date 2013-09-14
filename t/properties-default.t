@@ -75,4 +75,20 @@ group 'writer override' => sub {
     is $n, 23, 'default still not called';
 };
 
+like exception { TestProperty(default => sub { 23 }, required => 1) },
+    qr{A defaulted property cannot be required},
+    'default and required';
+
+like exception { TestProperty(required => 1, init_arg => undef) },
+    qr{A required property needs an init_arg},
+    'required without init_arg';
+
+like exception { TestProperty(builder => sub {}, default => sub {}) },
+    qr{A property cannot have a default and a builder},
+    'default and builder';
+
+like exception { TestProperty(lazy => 1, builder => undef) },
+    qr{A lazy property needs a builder or default},
+    'lazy without default or builder';
+
 done_testing;

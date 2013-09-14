@@ -7,6 +7,8 @@ use Object::Glib::Registry qw( find_meta register_meta );
 use Class::Method::Modifiers ();
 use Import::Into;
 use Module::Runtime qw( use_module );
+use Try::Tiny;
+use Object::Glib::CarpGroup;
 
 use aliased 'Object::Glib::Meta::Class';
 use aliased 'Object::Glib::Meta::Property';
@@ -34,7 +36,21 @@ sub import {
         install_sub {
             into => $class,
             as => $sub,
-            code => sub { $code->($meta, @_) },
+            code => sub {
+                my @args = @_;
+                my ($line, $file) = (caller)[2, 1];
+                try {
+                    $code->($meta, @args);
+                }
+                catch {
+                    my $err = $_;
+                    chomp $err;
+                    $err .= sprintf ' at %s line %d.', $file, $line
+                        unless $err =~ m{line\d+\.?$}xi;
+                    die "$err\n";
+                };
+                return 1;
+            },
         };
     }
     Class::Method::Modifiers->import::into($class);
@@ -52,7 +68,7 @@ sub _proto_property {
     my %arg = @_;
     my $prop_class;
     if (my $type = delete $arg{type}) {
-        $prop_class = use_module(join '::', Property, $type);
+        $prop_class = use_module(join '::', Property, 'Type', $type);
     }
     else {
         $prop_class = Property;

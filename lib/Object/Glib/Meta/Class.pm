@@ -7,13 +7,11 @@ use Module::Runtime qw( use_module );
 use Carp qw( croak );
 use Sub::Install qw( install_sub );
 use Object::Glib::Registry qw( has_meta find_meta );
+use Object::Glib::Types qw( :oo );
 use Class::ISA;
+use Object::Glib::CarpGroup;
 
 use namespace::clean;
-
-our @CARP_NOT = qw(
-    Object::Glib
-);
 
 has package => (
     is => 'ro',
@@ -77,9 +75,15 @@ sub add_signal {
 sub set_superclass {
     my ($self, $super) = @_;
     if (ref($super) eq 'ARRAY') {
-        croak q{An inner package specification needs a module and class}
+        croak join ' ',
+            q{A packaged superclass definition},
+            q{needs a module and class},
             unless @$super == 2;
         my ($module, $class) = @$super;
+        croak q{Invalid superclass package module}
+            unless is_class($module);
+        croak q{Invalid superclass package class}
+            unless is_class($class);
         $super = join '::', $module, $class;
         use_module($module)
             unless $super->can('new');
@@ -87,6 +91,8 @@ sub set_superclass {
             if $module->can('init');
     }
     else {
+        croak q{Invalid superclass}
+            unless is_class($super);
         use_module($super)
             unless $super->can('new');
     }

@@ -40,6 +40,11 @@ group 'default value' => sub {
     };
 };
 
+like exception {
+    TestProperty(type => 'Hash', signals => { foo => 1 });
+}, qr{Unknown property signals: foo},
+    'unknown signals';
+
 my $class = TestProperty(
     type => 'Hash',
     is => 'ro',
@@ -73,6 +78,10 @@ my $class = TestProperty(
         prop_clear => 'clear',
         prop_count => 'count',
         prop_clone => 'shallow_clone',
+        prop_map_pairs => 'map_pairs',
+        prop_map_joined => ['map_pairs', sub { join ':', @_ }],
+        prop_get_req => 'get_required',
+        prop_each_value => 'each_value',
     },
 );
 
@@ -90,27 +99,81 @@ group 'introspection' => sub {
     is $obj->prop_count, 3, 'count()';
 };
 
-group 'get' => sub {
-    my $obj = $class->new(prop => { x => 23, y => 42, a => 99 });
-    is $obj->prop_get('x'), 23, 'get($key)';
-    is $obj->prop_get('z'), undef, 'get($unknown)';
-    is $obj->prop_get_x, 23, 'get($curried)';
-    is scalar($obj->prop_get_all('x')), 1, 'scalar get_all($key)';
-    is_deeply [$obj->prop_get_all(qw( x y ))],
-        [23, 42],
-        'get_all(@keys)';
-    is_deeply [$obj->prop_get_all],
-        [],
-        'get_all()';
-    is_deeply [$obj->prop_get_xy],
-        [23, 42],
-        'get_all(@curried)';
-    is_deeply [$obj->prop_get_xy('a')],
-        [23, 42, 99],
-        'get_all(@curried, @other)';
+group 'mappings' => sub {
+    group 'map_pairs' => sub {
+        my $obj = $class->new(prop => { x => 23, y => 42 });
+        is_deeply [sort $obj->prop_map_pairs(sub { join '.', @_ })],
+            ['x.23', 'y.42'],
+            'map_pairs($code)';
+        is_deeply [sort $obj->prop_map_joined],
+            ['x:23', 'y:42'],
+            'map_pairs($curried)';
+    };
 };
 
-group 'set' => sub {
+group 'iteration' => sub {
+    group 'each_value' => sub {
+        my $obj = $class->new(prop => { x => 23, y => 42 });
+        my @done;
+        is $obj->prop_each_value(sub {
+            push @done, $_ . '-' . join ':', @_;
+        }, 'foo'), 1, 'each_value($code, $arg) return';
+        is_deeply [sort @done], ['23-23:foo', '42-42:foo'],
+            'each_value($code, $arg) calls';
+    };
+};
+
+group 'access' => sub {
+    group 'get' => sub {
+        my $obj = $class->new(prop => { x => 23, y => 42, a => 99 });
+        is $obj->prop_get('x'), 23, 'get($key)';
+        is $obj->prop_get('z'), undef, 'get($unknown)';
+        is $obj->prop_get_x, 23, 'get($curried)';
+    };
+    group 'get_all' => sub {
+        my $obj = $class->new(prop => { x => 23, y => 42, a => 99 });
+        is scalar($obj->prop_get_all('x')), 1, 'scalar get_all($key)';
+        is_deeply [$obj->prop_get_all(qw( x y ))],
+            [23, 42],
+            'get_all(@keys)';
+        is_deeply [$obj->prop_get_all],
+            [],
+            'get_all()';
+        is_deeply [$obj->prop_get_xy],
+            [23, 42],
+            'get_all(@curried)';
+        is_deeply [$obj->prop_get_xy('a')],
+            [23, 42, 99],
+            'get_all(@curried, @other)';
+    };
+    group 'get_required' => sub {
+        my $obj = $class->new(prop => { x => 23, y => 42, a => 99 });
+        is $obj->prop_get_req('x'), 23, 'with existing key';
+        like exception {
+            $obj->prop_get_req('foo');
+        }, qr{Unknown prop key 'foo'}, 'with non-existing key';
+    };
+};
+
+group 'get_buildable' => sub {
+    my $class = TestProperty(
+        type => 'Hash',
+        is => 'ro',
+        handles => {
+            get_value => ['get_buildable', sub {
+                my ($self, $key, $arg) = @_;
+                $arg ||= 'def';
+                return join ':', $self->prefix, $key, $arg;
+            }],
+        },
+        _ => { prefix => sub { 'pre' } },
+    );
+    my $obj = $class->new(prop => { x => 23 });
+    is $obj->get_value('x'), 23, 'existing value';
+    is_deeply $obj->get_prop, { x => 23 }, 'no changes';
+};
+
+group 'setting' => sub {
     my $obj = $class->new;
     my @emitted;
     for my $signal (qw( prop_inserted prop_changed )) {
@@ -120,21 +183,31 @@ group 'set' => sub {
             return undef;
         });
     }
-    is $obj->prop_set(y => 23), 1, 'set($key, $val) return';
-    is $obj->prop_get('y'), 23, 'set($key, $val) value';
-    is $obj->prop_set_x(42), 1, 'set($curried, $val) return';
-    is $obj->prop_get_x, 42, 'set($curried, $val) value';
-    is $obj->prop_set_all(x => 9, a => 10), 1,
-        'set_all(%kv) return';
-    is_deeply $obj->get_prop,
-        { a => 10, x => 9, y => 23 },
-        'set_all(%kv) value';
-    is_deeply \@emitted, [
-        ['prop_inserted', 'y', 23],
-        ['prop_inserted', 'x', 42],
-        ['prop_inserted', 'a', 10],
-        ['prop_changed', 'x', 9, 42],
-    ], 'emissions';
+    group 'set' => sub {
+        is $obj->prop_set(y => 23), 1, 'set($key, $val) return';
+        is $obj->prop_get('y'), 23, 'set($key, $val) value';
+        is $obj->prop_set_x(42), 1, 'set($curried, $val) return';
+        is $obj->prop_get_x, 42, 'set($curried, $val) value';
+        is $obj->prop_set_x(43), 1, 'changing set($curried, $val) return';
+        is $obj->prop_get_x, 43, 'changing set($curried, $val) value';
+        is_deeply \@emitted, [
+            ['prop_inserted', 'y', 23],
+            ['prop_inserted', 'x', 42],
+            ['prop_changed', 'x', 43, 42],
+        ], 'emissions';
+    };
+    @emitted = ();
+    group 'set_all' => sub {
+        is $obj->prop_set_all(x => 9, a => 10), 1,
+            'set_all(%kv) return';
+        is_deeply $obj->get_prop,
+            { a => 10, x => 9, y => 23 },
+            'set_all(%kv) value';
+        is_deeply [sort { $a->[1] cmp $b->[1] } @emitted], [
+            ['prop_inserted', 'a', 10],
+            ['prop_changed', 'x', 9, 43],
+        ], 'emissions';
+    };
 };
 
 group 'delete' => sub {
@@ -204,7 +277,7 @@ group 'clear' => sub {
     $obj->prop_set_all(x => 23, y => 17);
     is $obj->prop_clear, 1, 'clear()';
     is_deeply $obj->get_prop, {}, 'hash now empty';
-    is_deeply \@emitted, [
+    is_deeply [sort { $a->[0] cmp $b->[0] } @emitted], [
         ['x', 23],
         ['y', 17],
     ], 'emissions';

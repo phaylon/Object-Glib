@@ -146,4 +146,17 @@ group 'returns' => sub {
     ], 'calls';
 };
 
+like exception {
+    package MyTestNoSignalName;
+    use Object::Glib;
+    signal;
+}, qr{Missing signal name}, 'no signal name';
+
+like exception {
+    package MyTestWrongSignalArgs;
+    use Object::Glib;
+    signal 'foo' => 23;
+}, qr{Expected signal name followed by key/value list},
+    'wrong signal arguments';
+
 done_testing;
