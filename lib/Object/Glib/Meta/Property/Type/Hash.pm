@@ -92,6 +92,15 @@ sub _build_coercion {
     };
 }
 
+sub _make_assert_key {
+    my ($self) = @_;
+    my $name = $self->name;
+    return sub {
+        croak qq{Undefined $name key value}
+            unless defined $_[0];
+    };
+}
+
 sub _generate_map_pairs_delegation {
     my ($self, $meta, @curry) = @_;
     my $name = $self->name;
@@ -142,6 +151,14 @@ sub _generate_values_delegation {
     };
 }
 
+sub _generate_all_delegation {
+    my ($self, $meta) = @_;
+    my $get = $self->getter_ref;
+    return sub {
+        return %{ $_[0]->$get };
+    };
+}
+
 sub _generate_kv_delegation {
     my ($self, $meta) = @_;
     my $name = $self->name;
@@ -152,6 +169,21 @@ sub _generate_kv_delegation {
     };
 }
 
+sub _generate_get_reverse_delegation {
+    my ($self, $meta, @curry) = @_;
+    my $name = $self->name;
+    my $get = $self->getter_ref;
+    return sub {
+        my $instance = shift;
+        my ($key) = (@curry, @_);
+        croak q{Missing key argument}
+            unless defined $key;
+        my $hash = $instance->$get;
+        my %rev_hash = reverse %$hash;
+        return $rev_hash{ $key };
+    };
+}
+
 sub _generate_get_delegation {
     my ($self, $meta, @curry) = @_;
     my $name = $self->name;
@@ -159,6 +191,8 @@ sub _generate_get_delegation {
     return sub {
         my $instance = shift;
         my ($key) = (@curry, @_);
+        croak q{Missing key argument}
+            unless defined $key;
         return $instance->$get->{ $key };
     };
 }
@@ -167,9 +201,11 @@ sub _generate_get_required_delegation {
     my ($self, $meta, @curry) = @_;
     my $name = $self->name;
     my $get = $self->getter_ref;
+    my $assert_key = $self->_make_assert_key;
     return sub {
         my $instance = shift;
         my ($key) = (@curry, @_);
+        $key->$assert_key;
         my $hash = $instance->$get;
         croak qq{Unknown $name key '$key'}
             unless exists $hash->{ $key };

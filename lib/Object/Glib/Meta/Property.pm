@@ -28,7 +28,6 @@ has name => (is => 'ro', required => 1, isa => \&isa_ident);
 has setter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has getter_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
 has init_ref => (is => 'ro', lazy => 1, builder => 1, init_arg => undef);
-has pspec => (is => 'lazy', init_arg => undef);
 
 has required => (is => 'ro');
 has clearer => (is => 'ro', isa => \&isa_auto_ident);
@@ -293,7 +292,7 @@ sub _build_setter_ref {
     return sub {
         my ($instance, $value) = @_;
         return 1
-            unless $instance->get('object_glib_state');
+            unless $instance->get_property('object_glib_state');
         try {
             $value = $coerce->($value)
                 if $coerce;
@@ -399,7 +398,7 @@ sub _build_getter_ref {
     }
 }
 
-sub _build_pspec {
+sub pspec {
     my ($self) = @_;
     my @flags = (
         defined($self->init_arg) ? 'construct' : (),
@@ -424,7 +423,7 @@ sub glib {
         ) : (
             get => sub {
                 croak qq{Property '$name' cannot be read directly}
-                    if $_[0]->get('object_glib_state');
+                    if $_[0]->get_property('object_glib_state');
             },
         ),
         $self->writable ? (
@@ -432,7 +431,7 @@ sub glib {
         ) : (
             set => sub {
                 croak qq{Property '$name' cannot be written directly}
-                    if $_[0]->get('object_glib_state');
+                    if $_[0]->get_property('object_glib_state');
             },
         ),
     };

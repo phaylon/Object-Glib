@@ -10,6 +10,9 @@ use Object::Glib::Registry qw( has_meta find_meta );
 use Object::Glib::Types qw( :oo );
 use Class::ISA;
 use Object::Glib::CarpGroup;
+use Object::Glib::Packages qw( deparse_package );
+use Role::Tiny ();
+use Package::Stash;
 
 use namespace::clean;
 
@@ -18,24 +21,17 @@ has package => (
     required => 1,
 );
 
-has signals => (
-    is => 'bare',
-    init_arg => undef,
-    default => sub { {} },
-    reader => '_signals',
-);
-
-has properties => (
-    is => 'bare',
-    init_arg => undef,
-    default => sub { {} },
-    reader => '_properties',
-);
-
 has superclass => (
     is => 'ro',
     init_arg => undef,
     writer => '_set_raw_superclass',
+);
+
+has interfaces => (
+    is => 'bare',
+    reader => '_interfaces',
+    default => sub { [] },
+    init_arg => undef,
 );
 
 sub BUILD {
@@ -43,9 +39,15 @@ sub BUILD {
     $self->set_superclass('Glib::Object');
 }
 
+sub interfaces { @{ $_[0]->_interfaces } }
+
 sub _hierarchy {
     my ($self) = @_;
-    return Class::ISA::self_and_super_path($self->package);
+    return(
+        $self->package,
+        Glib::Type->list_ancestors($self->superclass),
+    );
+    #return Class::ISA::self_and_super_path($self->package);
 }
 
 sub install_method {
@@ -58,44 +60,15 @@ sub install_method {
     return 1;
 }
 
-sub add_property {
-    my ($self, $property) = @_;
-    $self->_properties->{ $property->name } = $property;
-    $property->install_into($self);
-    return 1;
-}
-
-sub add_signal {
-    my ($self, $signal) = @_;
-    $self->_signals->{ $signal->name } = $signal;
-    $signal->install_into($self);
+sub install_related {
+    my ($self, $related) = @_;
+    $related->install_into($self);
     return 1;
 }
 
 sub set_superclass {
     my ($self, $super) = @_;
-    if (ref($super) eq 'ARRAY') {
-        croak join ' ',
-            q{A packaged superclass definition},
-            q{needs a module and class},
-            unless @$super == 2;
-        my ($module, $class) = @$super;
-        croak q{Invalid superclass package module}
-            unless is_class($module);
-        croak q{Invalid superclass package class}
-            unless is_class($class);
-        $super = join '::', $module, $class;
-        use_module($module)
-            unless $super->can('new');
-        $module->init
-            if $module->can('init');
-    }
-    else {
-        croak q{Invalid superclass}
-            unless is_class($super);
-        use_module($super)
-            unless $super->can('new');
-    }
+    $super = deparse_package($super, 'superclass');
     $self->_set_raw_superclass($super);
     do {
         my $package = $self->package;
@@ -105,16 +78,42 @@ sub set_superclass {
     return 1;
 }
 
+sub add_role {
+    my ($self, $role) = @_;
+    $role = deparse_package($role, 'role');
+    my @glib_super = eval { Glib::Type->list_ancestors($role) };
+    if (grep { $_ eq 'Glib::Interface' } @glib_super) {
+        push @{ $self->_interfaces }, $role;
+    }
+    elsif (has_meta $role) {
+        my $meta = find_meta($role);
+        $meta->apply_to($self);
+    }
+    elsif (Role::Tiny->is_role($role)) {
+        Role::Tiny->apply_roles_to_package($self->package);
+    }
+    else {
+        croak "Unable to apply role $role";
+    }
+    return 1;
+}
+
 sub register {
     my ($self) = @_;
+    do {
+        my $package = $self->package;
+        no strict 'refs';
+        @{ "${package}::ISA" } = ();
+    };
     Glib::Type->register_object(
         $self->superclass,
         $self->package,
+        interfaces => [$self->interfaces],
         signals => {
             (map { ($_->name, $_->glib) } $self->signals),
         },
         properties => [
-            (map { $_->glib } values %{ $self->_properties }),
+            (map { $_->glib } $self->properties),
             Glib::ParamSpec->scalar(
                 'object_glib_state',
                 'object_glib_state',
@@ -125,35 +124,6 @@ sub register {
     );
     $self->_install_constructor;
     return 1;
-}
-
-sub signals {
-    my ($self) = @_;
-    return(
-        (values %{ $self->_signals }),
-        (map { ($_->property_signals) } $self->properties),
-    );
-}
-
-sub properties {
-    my ($self) = @_;
-    return values %{ $self->_properties };
-}
-
-sub _meta_properties {
-    my ($self) = @_;
-    return map {
-        my $class = $_;
-        has_meta($class)
-            ? (find_meta($class)->properties)
-            : ();
-    } $self->_hierarchy;
-}
-
-sub _nonmeta_properties {
-    my ($self) = @_;
-    my @nonmeta = grep { not has_meta($_) } $self->_hierarchy;
-    return $nonmeta[0]->list_properties;
 }
 
 sub _prepare_build_spec {
@@ -185,7 +155,8 @@ sub _prepare_build_spec {
         }
     }
     for my $class (reverse $self->_hierarchy) {
-        if (my $code = $class->can('BUILD_INSTANCE')) {
+        my $stash = Package::Stash->new($class);
+        if (my $code = $stash->get_symbol('&BUILD_INSTANCE')) {
             push @{ $spec{builders} }, $code;
         }
     }
@@ -221,8 +192,8 @@ sub _install_constructor {
                 $class, join ', ', @missing
                 if @missing;
             my $instance = Glib::Object::new($class, %construct);
-            $instance->set(object_glib_state => 'constructed');
-            $instance->set(%direct);
+            $instance->set_property(object_glib_state => 'constructed');
+            $instance->set_property(%direct);
             for my $key (keys %setter) {
                 my ($code, $value) = @{ $setter{ $key } };
                 $instance->$code($value);
@@ -243,10 +214,15 @@ sub _install_constructor {
             croak sprintf qq{Unknown constructor arguments for %s: %s},
                 $class, join ', ', @unknown
                 if @unknown;
-            $instance->set(object_glib_state => 'done');
+            $instance->set_property(object_glib_state => 'done');
             return $instance;
         },
     };
 }
+
+with qw(
+    Object::Glib::Meta::HasProperties
+    Object::Glib::Meta::HasSignals
+);
 
 1;

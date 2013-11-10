@@ -1,82 +1,36 @@
 use strictures 1;
 
 package Object::Glib;
+use parent 'Object::Glib::Exporter::Common';
 use Carp qw( croak );
-use Sub::Install qw( install_sub );
-use Object::Glib::Registry qw( find_meta register_meta );
 use Class::Method::Modifiers ();
 use Import::Into;
-use Module::Runtime qw( use_module );
-use Try::Tiny;
 use Object::Glib::CarpGroup;
+use Object::Glib::Exporter;
 
 use aliased 'Object::Glib::Meta::Class';
-use aliased 'Object::Glib::Meta::Property';
-use aliased 'Object::Glib::Meta::Signal';
 
 use namespace::clean;
 
 our $VERSION = '0.000001';
 $VERSION = eval $VERSION;
 
-my @_export = qw(
-    property
-    signal
-    extends
-    implements
-    register
+setup_exports(
+    meta_class => Class,
+    export => [qw(
+        property
+        signal
+        extends
+        with
+        register
+    )],
+    finalize => sub {
+        my ($package) = @_;
+        Class::Method::Modifiers->import::into($package);
+        strictures->import::into($package, 1);
+        return 1;
+    },
 );
-
-sub import {
-    my $class = caller;
-    my $meta = Class->new(package => $class);
-    register_meta($meta);
-    for my $sub (@_export) {
-        my $code = __PACKAGE__->can("_proto_$sub");
-        install_sub {
-            into => $class,
-            as => $sub,
-            code => sub {
-                my @args = @_;
-                my ($line, $file) = (caller)[2, 1];
-                try {
-                    $code->($meta, @args);
-                }
-                catch {
-                    my $err = $_;
-                    chomp $err;
-                    $err .= sprintf ' at %s line %d.', $file, $line
-                        unless $err =~ m{line\d+\.?$}xi;
-                    die "$err\n";
-                };
-                return 1;
-            },
-        };
-    }
-    Class::Method::Modifiers->import::into($class);
-    strictures->import::into($class, 1);
-    return 1;
-}
-
-sub _proto_property {
-    my $meta = shift;
-    my $name = shift;
-    croak q{Missing property name}
-        unless defined $name;
-    croak q{Expected property name followed by key/value list}
-        if @_ % 2;
-    my %arg = @_;
-    my $prop_class;
-    if (my $type = delete $arg{type}) {
-        $prop_class = use_module(join '::', Property, 'Type', $type);
-    }
-    else {
-        $prop_class = Property;
-    }
-    my $prop = $prop_class->new(%arg, name => $name);
-    $meta->add_property($prop);
-    return 1;
-}
 
 sub _proto_extends {
     my ($meta, $super) = @_;
@@ -85,21 +39,6 @@ sub _proto_extends {
     $meta->set_superclass($super);
     return 1;
 }
-
-sub _proto_signal {
-    my $meta = shift;
-    my $name = shift;
-    croak q{Missing signal name}
-        unless defined $name;
-    croak q{Expected signal name followed by key/value list}
-        if @_ % 2;
-    my %arg = @_;
-    my $signal = Signal->new(%arg, name => $name);
-    $meta->add_signal($signal);
-    return 1;
-}
-
-sub _proto_implements { }
 
 sub _proto_register {
     my $meta = shift;

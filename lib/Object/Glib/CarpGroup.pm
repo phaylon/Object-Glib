@@ -9,7 +9,11 @@ my @_external = qw(
 );
 
 my @_internal = 'Object::Glib', map "Object::Glib::$_", qw(
+    Exporter
+    Exporter::Common
     Meta::Class
+    Meta::HasProperties
+    Meta::HasSignals
     Meta::Property
     Meta::Property::Type::Array
     Meta::Property::Type::Hash
@@ -17,8 +21,11 @@ my @_internal = 'Object::Glib', map "Object::Glib::$_", qw(
     Meta::Property::Typed
     Meta::Property::Typed::Container
     Meta::Property::Typed::Primitive
+    Meta::Role
     Meta::Signal
+    Packages
     Registry
+    Role
     Types
     Values
 );
